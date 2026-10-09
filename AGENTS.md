@@ -11,3 +11,4 @@
 
 - Map data flows OSM -> MapData (src/map) -> per-tile worker builds (src/workers); keeps the main thread free.
 - Per-frame state lives in world/worldState.ts, not Zustand; avoids re-renders.
+- Create and dispose workers and Rapier controllers in effects, with frame-loop guards, so StrictMode cleanup cannot leave freed resources in use.

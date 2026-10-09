@@ -3,7 +3,7 @@
  * Vehicles (future) should take over input via src/vehicles without touching this file:
  * when `active` is false the player stops reading input.
  */
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier, type RapierCollider, type RapierRigidBody } from "@react-three/rapier";
 import { footstep } from "../audio/audio";
@@ -25,20 +25,24 @@ export function Player({ active = true }: { active?: boolean }) {
     step: 0, safe: [...worldState.spawn] as number[], safeT: 0, pubT: 0, nameT: 0, grounded: false,
   });
 
-  const ctrl = useMemo(() => {
+  const ctrlRef = useRef<ReturnType<typeof world.createCharacterController> | null>(null);
+  useEffect(() => {
     const c = world.createCharacterController(0.03);
     c.enableAutostep(0.45, 0.2, true);
     c.enableSnapToGround(0.4);
     c.setSlideEnabled(true);
     c.setMaxSlopeClimbAngle((50 * Math.PI) / 180);
     c.setMinSlopeSlideAngle((60 * Math.PI) / 180);
-    return c;
+    ctrlRef.current = c;
+    return () => {
+      if (ctrlRef.current === c) ctrlRef.current = null;
+      world.removeCharacterController(c);
+    };
   }, [world]);
-  useEffect(() => () => world.removeCharacterController(ctrl), [world, ctrl]);
 
   useFrame((_, raw) => {
-    const b = body.current, c = col.current;
-    if (!b || !c) return;
+    const b = body.current, c = col.current, ctrl = ctrlRef.current;
+    if (!b || !c || !ctrl) return;
     const dt = Math.min(raw, 0.05);
     const s = st.current;
     const game = useGame.getState();
