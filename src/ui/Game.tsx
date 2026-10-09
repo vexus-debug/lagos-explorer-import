@@ -115,7 +115,7 @@ function SettingsFields() {
 }
 
 export function Game() {
-  const { phase, mapReady, loading, set, settings, toggleUi } = useGame();
+  const { phase, mapReady, loading, set, settings, toggleUi, paused } = useGame();
   const [err, setErr] = useState("");
   useEffect(() => { prepare(false).catch((e) => setErr(String(e))); }, []);
   useEffect(() => {
@@ -174,7 +174,7 @@ export function Game() {
         <DebugProbe />
       </Canvas>
       <Hud />
-      {input.mobile && !useGame.getState().paused && <MobileControls />}
+      {input.mobile && !paused && <MobileControls />}
     </div>
   );
 }
