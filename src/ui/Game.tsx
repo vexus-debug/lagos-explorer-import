@@ -7,6 +7,7 @@ import { loadMapData } from "../map/loadMap";
 import { buildTileIndex } from "../map/tiles";
 import { initAudio, setVolume } from "../audio/audio";
 import { attachDesktopInput, input } from "../player/input";
+import { MobileControls } from "../player/MobileControls";
 import { Player } from "../player/Player";
 import { qualityConfig, useGame } from "../store/game";
 import { Atmosphere } from "../world/Atmosphere";
@@ -173,6 +174,7 @@ export function Game() {
         <DebugProbe />
       </Canvas>
       <Hud />
+      {input.mobile && !useGame.getState().paused && <MobileControls />}
     </div>
   );
 }
