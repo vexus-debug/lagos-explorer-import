@@ -1,8 +1,8 @@
-/** On-screen touch controls: left joystick to move, drag right half to look, buttons for jump/sprint/crouch. */
-import { useEffect, useRef, useState } from "react";
+/** Touch controls for movement, camera look, and player actions. */
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { input } from "./input";
 
-const STICK = 56; // px radius of joystick travel
+const STICK = 48;
 
 export function MobileControls() {
   const [stick, setStick] = useState({ x: 0, y: 0, active: false });
@@ -18,71 +18,87 @@ export function MobileControls() {
     input.crouch = crouch;
   }, [crouch]);
 
-  const onTouchStart = (e: React.TouchEvent) => {
-    for (const t of Array.from(e.changedTouches)) {
-      if (t.clientX < window.innerWidth * 0.45 && !joy.current) {
-        joy.current = { id: t.identifier, cx: t.clientX, cy: t.clientY };
-        setStick({ x: 0, y: 0, active: true });
-      } else if (!look.current) {
-        look.current = { id: t.identifier, x: t.clientX, y: t.clientY };
-      }
-    }
+  const startJoy = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" || joy.current) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rect = e.currentTarget.getBoundingClientRect();
+    joy.current = { id: e.pointerId, cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2 };
+    setStick({ x: 0, y: 0, active: true });
+    moveJoy(e);
   };
-  const onTouchMove = (e: React.TouchEvent) => {
-    for (const t of Array.from(e.changedTouches)) {
-      if (joy.current && t.identifier === joy.current.id) {
-        let dx = t.clientX - joy.current.cx;
-        let dy = t.clientY - joy.current.cy;
-        const len = Math.hypot(dx, dy);
-        if (len > STICK) {
-          dx = (dx / len) * STICK;
-          dy = (dy / len) * STICK;
-        }
-        input.joyX = dx / STICK;
-        input.joyY = dy / STICK;
-        setStick({ x: dx, y: dy, active: true });
-      } else if (look.current && t.identifier === look.current.id) {
-        input.lookX += (t.clientX - look.current.x) * 2.5;
-        input.lookY += (t.clientY - look.current.y) * 2.5;
-        look.current = { id: t.identifier, x: t.clientX, y: t.clientY };
-      }
+
+  const moveJoy = (e: PointerEvent<HTMLDivElement>) => {
+    if (joy.current?.id !== e.pointerId) return;
+    let dx = e.clientX - joy.current.cx;
+    let dy = e.clientY - joy.current.cy;
+    const len = Math.hypot(dx, dy);
+    if (len > STICK) {
+      dx = (dx / len) * STICK;
+      dy = (dy / len) * STICK;
     }
+    input.joyX = dx / STICK;
+    input.joyY = dy / STICK;
+    setStick({ x: dx, y: dy, active: true });
   };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    for (const t of Array.from(e.changedTouches)) {
-      if (joy.current && t.identifier === joy.current.id) {
-        joy.current = null;
-        input.joyX = 0;
-        input.joyY = 0;
-        setStick({ x: 0, y: 0, active: false });
-      } else if (look.current && t.identifier === look.current.id) {
-        look.current = null;
-      }
-    }
+
+  const endJoy = (e: PointerEvent<HTMLDivElement>) => {
+    if (joy.current?.id !== e.pointerId) return;
+    joy.current = null;
+    input.joyX = 0;
+    input.joyY = 0;
+    setStick({ x: 0, y: 0, active: false });
+  };
+
+  const startLook = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" || look.current) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    look.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  };
+
+  const moveLook = (e: PointerEvent<HTMLDivElement>) => {
+    if (look.current?.id !== e.pointerId) return;
+    input.lookX += (e.clientX - look.current.x) * 2.5;
+    input.lookY += (e.clientY - look.current.y) * 2.5;
+    look.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  };
+
+  const endLook = (e: PointerEvent<HTMLDivElement>) => {
+    if (look.current?.id === e.pointerId) look.current = null;
   };
 
   const btn = "pointer-events-auto flex h-16 w-16 items-center justify-center rounded-full border border-foreground/30 bg-background/60 font-display text-sm text-foreground backdrop-blur active:bg-primary/40";
 
   return (
-    <div
-      className="fixed inset-0 z-20 touch-none select-none"
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onTouchCancel={onTouchEnd}
-    >
-      {/* Joystick base */}
-      <div className="pointer-events-none absolute bottom-8 left-8 h-32 w-32 rounded-full border border-foreground/25 bg-background/40 backdrop-blur">
+    <div className="pointer-events-none fixed inset-0 z-20 select-none">
+      <div
+        aria-label="Look around"
+        className="pointer-events-auto absolute inset-y-0 left-[40%] right-0 touch-none"
+        onPointerDown={startLook}
+        onPointerMove={moveLook}
+        onPointerUp={endLook}
+        onPointerCancel={endLook}
+        onLostPointerCapture={endLook}
+      />
+      <div
+        aria-label="Move"
+        className="pointer-events-auto absolute bottom-8 left-8 grid h-32 w-32 touch-none place-items-center rounded-full border border-foreground/25 bg-background/40 backdrop-blur"
+        onPointerDown={startJoy}
+        onPointerMove={moveJoy}
+        onPointerUp={endJoy}
+        onPointerCancel={endJoy}
+        onLostPointerCapture={endJoy}
+      >
         <div
-          className="absolute left-1/2 top-1/2 h-14 w-14 rounded-full bg-foreground/70"
-          style={{ transform: `translate(calc(-50% + ${stick.x}px), calc(-50% + ${stick.y}px))` }}
+          className="pointer-events-none h-14 w-14 rounded-full bg-foreground/70"
+          style={{ transform: `translate(${stick.x}px, ${stick.y}px)` }}
         />
       </div>
-      {/* Action buttons */}
-      <div className="absolute bottom-8 right-6 flex flex-col items-end gap-3">
+      <div className="pointer-events-none absolute bottom-8 right-6 z-10 flex flex-col items-end gap-3">
         <button
           className={btn}
-          onTouchStart={(e) => {
+          onPointerDown={(e) => {
             e.stopPropagation();
             input.jump = true;
           }}
@@ -92,18 +108,18 @@ export function MobileControls() {
         <div className="flex gap-3">
           <button
             className={`${btn} ${crouch ? "bg-primary/50" : ""}`}
-            onTouchStart={(e) => {
+            onPointerDown={(e) => {
               e.stopPropagation();
-              setCrouch((c) => !c);
+              setCrouch((value) => !value);
             }}
           >
             Crouch
           </button>
           <button
             className={`${btn} ${sprint ? "bg-primary/50" : ""}`}
-            onTouchStart={(e) => {
+            onPointerDown={(e) => {
               e.stopPropagation();
-              setSprint((s) => !s);
+              setSprint((value) => !value);
             }}
           >
             Sprint
