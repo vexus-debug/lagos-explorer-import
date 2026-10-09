@@ -25,8 +25,10 @@ export function TileManager() {
   const quality = useGame((s) => s.settings.quality);
   const q = qualityConfig(quality);
 
-  const worker = useMemo(() => new Worker(new URL("../workers/tileBuilder.worker.ts", import.meta.url), { type: "module" }), []);
+  const workerRef = useRef<Worker | null>(null);
   useEffect(() => {
+    const worker = new Worker(new URL("../workers/tileBuilder.worker.ts", import.meta.url), { type: "module" });
+    workerRef.current = worker;
     worker.onmessage = (e: MessageEvent<TileMesh>) => {
       const m = e.data;
       inflight.current.delete(m.key);
@@ -35,8 +37,12 @@ export function TileManager() {
       worldState.loaded.set(m.key, { features: f, lamps: m.lamps });
       setTiles((prev) => ({ ...prev, [m.key]: m }));
     };
-    return () => worker.terminate();
-  }, [worker]);
+    return () => {
+      if (workerRef.current === worker) workerRef.current = null;
+      inflight.current.clear();
+      worker.terminate();
+    };
+  }, []);
 
   useFrame((_, dt) => {
     acc.current += dt;
@@ -55,7 +61,8 @@ export function TileManager() {
         if (d <= q.load && idx.has(k) && !worldState.loaded.has(k) && !inflight.current.has(k)) wanted.push([k, d]);
       }
     wanted.sort((a, b) => a[1] - b[1]);
-    for (const [k] of wanted) {
+    const worker = workerRef.current;
+    if (worker) for (const [k] of wanted) {
       if (inflight.current.size >= 2) break;
       inflight.current.add(k);
       worker.postMessage(idx.get(k));
