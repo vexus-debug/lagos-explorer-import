@@ -8,3 +8,6 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Map data flows OSM -> MapData (src/map) -> per-tile worker builds (src/workers); keeps the main thread free.
+- Per-frame state lives in world/worldState.ts, not Zustand; avoids re-renders.
